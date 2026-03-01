@@ -11,7 +11,8 @@ const wss = new WebSocket.Server({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
     const { query } = url.parse(request.url, true);
-    const provided = (query.token || "").trim();
+   const provided = decodeURIComponent(query.token || "").trim();
+
 
     // This log will tell you exactly why it's failing
     console.log(`AUTH: Browser sent [${provided}] | Server expects [${SYSTEM_PASSWORD}]`);
