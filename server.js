@@ -2,24 +2,28 @@ const WebSocket = require('ws');
 const http = require('http');
 const url = require('url');
 
-// This value comes from your Render Environment Variables
-const SYSTEM_PASSWORD = process.env.ImaanManpreet || "default_local_pass"; 
-const PORT = process.env.PORT || 3000;
+// This checks Render's environment, then falls back to your specific password
+const SYSTEM_PASSWORD = (process.env.ImaanManpreet || "Imaan@123").trim(); 
+const PORT = process.env.PORT || 10000;
 
 const server = http.createServer();
 const wss = new WebSocket.Server({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
     const { query } = url.parse(request.url, true);
+    const provided = (query.token || "").trim();
+
+    // This log will tell you exactly why it's failing
+    console.log(`AUTH: Browser sent [${provided}] | Server expects [${SYSTEM_PASSWORD}]`);
     
-    // AUTHENTICATION CHECK: Only allow connection if token matches
-    if (query.token !== SYSTEM_PASSWORD) {
-        console.log("Rejected: Invalid Token");
+    if (provided !== SYSTEM_PASSWORD) {
+        console.log("RESULT: ❌ Password Mismatch");
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
     }
 
+    console.log("RESULT: ✅ Access Granted");
     wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
     });
@@ -27,16 +31,16 @@ server.on('upgrade', (request, socket, head) => {
 
 wss.on('connection', (ws) => {
     console.log('New Authenticated Client Connected');
-
     ws.on('message', (data) => {
-        // BROADCAST: Send audio data to all OTHER authenticated clients
         wss.clients.forEach(client => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
-                // Ensure data is sent as binary for PCM audio
                 client.send(data, { binary: true });
             }
         });
     });
 });
 
-server.listen(PORT, () => console.log(`Secure Server on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`Secure Server on port ${PORT}`);
+    console.log(`Active Password is: ${SYSTEM_PASSWORD}`);
+});
