@@ -1,44 +1,42 @@
 const WebSocket = require('ws');
 const http = require('http');
-const url = require('url');
 
-// Environment variable with strict trimming
-const SYSTEM_PASSWORD = (process.env.ImaanManpreet || "Imaan@123").trim(); 
+// This regex removes ANY whitespace, newlines, or invisible characters
+const clean = (str) => str.replace(/[\s\n\r\t]/g, '');
+
+const SYSTEM_PASSWORD = clean(process.env.ImaanManpreet || "Imaan@123"); 
 const PORT = process.env.PORT || 10000;
 
 const server = http.createServer();
 const wss = new WebSocket.Server({ noServer: true });
 
-// Helper to find hidden characters (like spaces, \r, or %40)
-const toHex = (str) => Buffer.from(str).toString('hex');
-
 server.on('upgrade', (request, socket, head) => {
-    const { query } = url.parse(request.url, true);
+    // Use the modern WHATWG URL parser for better reliability
+    const fullUrl = new URL(request.url, `http://${request.headers.host}`);
+    const rawToken = fullUrl.searchParams.get('token') || "";
     
-    // Fix: Decode URL characters (like @) and trim spaces
-    const provided = decodeURIComponent(query.token || "").trim();
+    // Clean both sides strictly
+    const provided = clean(decodeURIComponent(rawToken));
 
-    console.log(`--- AUTH ATTEMPT ---`);
-    console.log(`Provided: [${provided}] | Hex: ${toHex(provided)}`);
-    console.log(`Expected: [${SYSTEM_PASSWORD}] | Hex: ${toHex(SYSTEM_PASSWORD)}`);
+    console.log(`--- FORCE-CLEANED AUTH ---`);
+    console.log(`Final Provided: [${provided}]`);
+    console.log(`Final Expected: [${SYSTEM_PASSWORD}]`);
     
     if (provided !== SYSTEM_PASSWORD) {
-        console.log("RESULT: ❌ Password Mismatch");
+        console.log("RESULT: ❌ STILL NOT MATCHING");
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
     }
 
-    console.log("RESULT: ✅ Access Granted");
+    console.log("RESULT: ✅ ACCESS GRANTED");
     wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
     });
 });
 
 wss.on('connection', (ws) => {
-    console.log('New Authenticated Client Connected');
     ws.on('message', (data) => {
-        // Broadcast PCM audio data to all other connected clients
         wss.clients.forEach(client => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(data, { binary: true });
@@ -47,8 +45,4 @@ wss.on('connection', (ws) => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`Secure Server active on port ${PORT}`);
-    console.log(`System Password: ${SYSTEM_PASSWORD}`);
-    console.log(`System Hex: ${toHex(SYSTEM_PASSWORD)}`);
-});
+server.listen(PORT, () => console.log(`Server running. Expecting: ${SYSTEM_PASSWORD}`));
