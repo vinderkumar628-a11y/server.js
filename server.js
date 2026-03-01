@@ -3,7 +3,7 @@ const http = require('http');
 const url = require('url');
 
 // This value comes from your Render Environment Variables
-const SYSTEM_PASSWORD = process.env.Imaan@123 || "default_local_pass"; 
+const SYSTEM_PASSWORD = process.env.ImaanManpreet || "default_local_pass"; 
 const PORT = process.env.PORT || 3000;
 
 const server = http.createServer();
